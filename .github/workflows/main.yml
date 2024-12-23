@@ -1,0 +1,66 @@
+name: Build Flutter APK
+
+on:
+  push:
+    branches:
+      - main # You can change this to any branch you want to trigger the build
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the code
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Step 2: Set up Flutter
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'  # You can specify a version here, like '3.7.0'
+
+      # Step 3: Install Android SDK and dependencies
+      - name: Install Android SDK and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip tar
+          sudo apt-get install -y openjdk-11-jdk  # Install Java for Android builds
+          sudo apt-get install -y lib32z1 lib32ncurses6 lib32stdc++6  # Install necessary libraries for Android builds
+          
+          # Install Android SDK
+          wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
+          unzip commandlinetools-linux-8512546_latest.zip -d $HOME/Android
+          rm commandlinetools-linux-8512546_latest.zip
+          
+          # Set up environment variables for Android SDK
+          echo "export ANDROID_HOME=$HOME/Android/cmdline-tools" >> $GITHUB_ENV
+          echo "export PATH=$ANDROID_HOME/bin:$PATH" >> $GITHUB_ENV
+
+          # Install required SDK components (platforms, build tools, etc.)
+          yes | $ANDROID_HOME/bin/sdkmanager --licenses
+          yes | $ANDROID_HOME/bin/sdkmanager "platform-tools" "build-tools;33.0.0" "platforms;android-33"
+
+      # Step 4: Install Flutter dependencies
+      - name: Install Flutter dependencies
+        run: flutter pub get
+
+      # Step 5: Ensure Android SDK is set up (Flutter setup for Android)
+      - name: Set up Android SDK in Flutter
+        run: |
+          flutter doctor --android-licenses
+          flutter doctor -v  # Verify Flutter setup for Android
+
+      # Step 6: Build APK
+      - name: Build APK
+        run: flutter build apk --release
+
+      # Step 7: Upload APK as an artifact (optional)
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: app-release.apk
+          path: build/app/outputs/flutter-apk/app-release.apk
